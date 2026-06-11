@@ -152,12 +152,23 @@ def split_sections(md_text: str) -> list[str]:
 
 def detect_page_type(section: str) -> str:
     """检测页面类型。"""
+    has_image = False
+    has_structured = False
     for line in section.split("\n"):
         s = line.strip()
-        if re.match(r"^#\s+", s):         # 一级标题 → 封面
+        if re.match(r"^#\s+", s) and not s.startswith("## "):  # 一级标题 → 封面
             return "cover"
-        if re.match(r"^!\[.*\]\(.+\)", s):  # 图片引用 → 图片页
-            return "image"
+        if re.match(r"^!\[.*\]\(.+\)", s):  # 图片引用
+            has_image = True
+        # 结构化内容：二级标题、列表、表格
+        if (s.startswith("## ") or re.match(r"^(\d+)\.\s+", s) or
+                re.match(r"^[-*]\s+", s) or (s.startswith("|") and s.endswith("|"))):
+            has_structured = True
+
+    if has_image and has_structured:
+        return "text_image"
+    if has_image:
+        return "image"
     return "content"
 
 
@@ -259,6 +270,79 @@ def parse_image_page(section: str) -> tuple[str, str]:
         elif not s.startswith("#"):
             caption = s
     return caption, image_path
+
+
+def parse_text_image(section: str) -> tuple[list[tuple], str]:
+    """解析图配文页，返回 (items, image_path)。
+    文字部分解析逻辑同 content 页，图片引用行单独提取。
+    """
+    items: list[tuple] = []
+    image_path = ""
+    lines = section.split("\n")
+    i = 0
+
+    while i < len(lines):
+        s = lines[i].strip()
+        if not s:
+            i += 1
+            continue
+
+        # 图片引用行 → 提取路径，不加入 items
+        m = re.match(r"^!\[.*\]\((.+)\)$", s)
+        if m:
+            image_path = m.group(1).strip()
+            i += 1
+            continue
+
+        # ── 表格检测：以 | 开头和结尾的连续行 ──
+        if s.startswith("|") and s.endswith("|"):
+            table_lines = [s]
+            j = i + 1
+            while j < len(lines):
+                nxt = lines[j].strip()
+                if nxt.startswith("|") and nxt.endswith("|"):
+                    table_lines.append(nxt)
+                    j += 1
+                else:
+                    break
+
+            if len(table_lines) >= 2:
+                headers = [c.strip() for c in table_lines[0].split("|")[1:-1]]
+                rows = []
+                for tl in table_lines[2:]:
+                    row = [c.strip() for c in tl.split("|")[1:-1]]
+                    if any(row):
+                        rows.append(row)
+                items.append(("table", headers, rows))
+                i = j
+                continue
+
+        # 跳过封面专属的一级标题
+        if re.match(r"^#\s+", s) and not re.match(r"^##\s+", s):
+            i += 1
+            continue
+
+        if s.startswith("## "):
+            items.append(("h2", s[3:].strip()))
+            i += 1
+            continue
+
+        m2 = re.match(r"^(\d+)\.\s+(.+)$", s)
+        if m2:
+            items.append(("ordered", m2.group(2).strip(), int(m2.group(1))))
+            i += 1
+            continue
+
+        m2 = re.match(r"^[-*]\s+(.+)$", s)
+        if m2:
+            items.append(("unordered", m2.group(1).strip()))
+            i += 1
+            continue
+
+        items.append(("plain", s))
+        i += 1
+
+    return items, image_path
 
 
 # ── 幻灯片创建 ──────────────────────────────────────────────
@@ -396,6 +480,91 @@ def create_image_slide(prs: Presentation, caption: str, img_path: str):
         print(f"  ⚠ 图片不存在: {img_path}")
 
 
+def create_text_image_slide(prs: Presentation, items: list[tuple], img_path: str):
+    """创建图配文幻灯片：左侧 2/3 文字，右侧 1/3 图片。
+    文字部分支持的数据类型和样式与原"内容页"一致。
+    """
+    slide = _new_blank_slide(prs)
+    _set_background(slide, BG_CONTENT)
+
+    # ── 左侧 2/3：文字区域 ──
+    text_left = Inches(0.8)
+    text_width = Inches(8.0)
+
+    text_items = [it for it in items if it[0] != "table"]
+    table_items = [it for it in items if it[0] == "table"]
+
+    if text_items:
+        text_height = Inches(2.5) if table_items else Inches(5.8)
+        tb = slide.shapes.add_textbox(text_left, Inches(0.8), text_width, text_height)
+        tf = tb.text_frame
+        tf.word_wrap = True
+
+        first = True
+        for item in text_items:
+            p = tf.paragraphs[0] if first else tf.add_paragraph()
+            first = False
+            t = item[0]
+
+            if t == "h2":
+                p.text = item[1]
+                _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+                p.space_after = Pt(24)
+            elif t == "ordered":
+                p.text = f"{item[2]}. {item[1]}"
+                _set_font(p, FONT_CN_BODY, Pt(32))
+                p.space_after = Pt(12)
+            elif t == "unordered":
+                p.text = f"• {item[1]}"
+                _set_font(p, FONT_CN_BODY, Pt(32))
+                p.space_after = Pt(12)
+            else:  # plain
+                p.text = item[1]
+                _set_font(p, FONT_CN_BODY, Pt(32))
+                p.space_after = Pt(12)
+
+    if table_items:
+        table_top = Inches(3.5) if text_items else Inches(0.8)
+        for _, headers, rows in table_items:
+            num_cols = len(headers)
+            num_rows = len(rows) + 1
+
+            col_width = Inches(text_width.inches / max(num_cols, 1))
+            row_height = Inches(0.5)
+
+            table_shape = slide.shapes.add_table(
+                num_rows, num_cols,
+                text_left, table_top,
+                col_width * num_cols, row_height * num_rows
+            )
+            tbl = table_shape.table
+
+            for ci in range(num_cols):
+                tbl.columns[ci].width = col_width
+
+            for ci, header_text in enumerate(headers):
+                cell = tbl.cell(0, ci)
+                cell.text = header_text
+                _set_cell_font(cell, FONT_CN_H2, Pt(32), bold=True)
+
+            for ri, row in enumerate(rows):
+                for ci, cell_text in enumerate(row):
+                    if ci < num_cols:
+                        cell = tbl.cell(ri + 1, ci)
+                        cell.text = cell_text
+                        _set_cell_font(cell, FONT_CN_BODY, Pt(32))
+
+            _style_table_three_line(tbl, num_rows, num_cols)
+            table_top += row_height * num_rows + Inches(0.3)
+
+    # ── 右侧 1/3：图片区域 ──
+    if img_path and os.path.exists(img_path):
+        img_left = Inches(9.2)
+        slide.shapes.add_picture(img_path, img_left, Inches(1.5), Inches(3.6), Inches(4.5))
+    elif img_path:
+        print(f"  ⚠ 图片不存在: {img_path}")
+
+
 # ── 主流程 ──────────────────────────────────────────────────
 
 def create_end_slide(prs: Presentation):
@@ -440,6 +609,9 @@ def build(md_path: str = INPUT_FILE, output_path: str = OUTPUT_FILE):
         elif pt == "image":
             caption, img_path = parse_image_page(sec)
             create_image_slide(prs, caption, img_path)
+        elif pt == "text_image":
+            items, img_path = parse_text_image(sec)
+            create_text_image_slide(prs, items, img_path)
         else:
             items = parse_content(sec)
             create_content_slide(prs, items)

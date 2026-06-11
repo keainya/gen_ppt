@@ -7,7 +7,7 @@ user-invocable: true
 
 # gen_ppt — 结构化 Markdown 编译为 PPT
 
-将结构化的 `content.md` 编译为 `output.pptx`，支持 4 种页面类型及自动结束页。
+将结构化的 `content.md` 编译为 `output.pptx`，支持 5 种页面类型及自动结束页。
 
 ## 项目文件
 
@@ -67,6 +67,19 @@ python build_ppt.py
 ![](src/diagram.png)
 ```
 
+### 图配文页
+
+同时包含结构化文字内容（二级标题、列表、表格等）和图片引用，自动识别为图配文页。左侧 2/3 渲染文字，右侧 1/3 渲染图片：
+
+```markdown
+## 系统架构
+- 前端采用 React 框架
+- 后端使用 Python FastAPI
+- 数据库采用 PostgreSQL
+
+![](src/architecture.png)
+```
+
 ### 结束页
 
 **无需在 Markdown 中编写**，PPT 末尾自动生成「谢谢」页。
@@ -77,7 +90,8 @@ python build_ppt.py
 |------|---------|--------|
 | 封面 | `# ` 一级标题 | `src/cover.png` |
 | 内容 | 列表、表格、纯文本等 | `src/background.png` |
-| 图片 | `![](...)` 图片引用 | `src/background.png` |
+| 图片 | `![](...)` 图片引用（无结构化文字） | `src/background.png` |
+| 图配文 | 结构化文字 + 图片引用 | `src/background.png` |
 | 结束 | 自动追加 | `src/cover.png` |
 
 背景图缺失时回退为纯白背景。
