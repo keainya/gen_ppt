@@ -81,10 +81,10 @@ PPT 支持以下 3 种页面类型：
 
 ```
 gen_ppt/
-├── build_ppt.py      # 主构建脚本，读取 content.md 生成 .pptx
-├── content.md        # 输入的结构化 Markdown 内容
-├── src/              # 静态资源目录
-│   ├── cover.png         # 封面背景图
-│   └── background.png         # 内容页/图片展示页背景图
-└── README.md         # 本文件
+├── build_ppt.py       # 主构建脚本，读取 content.md 生成 .pptx
+├── content.md         # 输入的结构化 Markdown 内容
+├── src/               # 静态资源目录
+│   ├── cover.png      # 封面背景图
+│   └── background.png # 内容页/图片展示页背景图
+└── README.md          # 本文件
 ```
