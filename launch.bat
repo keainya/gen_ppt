@@ -1,8 +1,9 @@
 @echo off
 cd /d "%~dp0"
 
-if not exist ".venv\" (
-    echo [*] Creating Python virtual environment...
+if not exist ".venv\Scripts\activate.bat" (
+    echo [*] .venv incomplete or missing, recreating...
+    if exist ".venv\" rmdir /s /q ".venv"
     python -m venv .venv
 )
 

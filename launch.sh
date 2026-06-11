@@ -3,8 +3,9 @@ set -e
 
 cd "$(dirname "$0")"
 
-if [ ! -d ".venv" ]; then
-    echo "🔧 创建 Python 虚拟环境..."
+if [ ! -f ".venv/bin/activate" ]; then
+    echo "🔧 .venv 不完整或缺失，重新创建..."
+    rm -rf .venv
     python3 -m venv .venv
 fi
 
