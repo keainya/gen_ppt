@@ -16,6 +16,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.oxml.ns import qn
 from lxml import etree
+from PIL import Image
 
 # ── 常量 ────────────────────────────────────────────────────
 
@@ -345,6 +346,14 @@ def parse_text_image(section: str) -> tuple[list[tuple], str]:
     return items, image_path
 
 
+def _fit_image_size(img_path: str, max_w: float, max_h: float) -> tuple[float, float]:
+    """根据图片原始尺寸，在 max_w × max_h 范围内等比例缩放，返回 (w, h)。"""
+    with Image.open(img_path) as im:
+        orig_w, orig_h = im.size
+    scale = min(max_w / orig_w, max_h / orig_h, 1.0)  # 不放大小图
+    return orig_w * scale, orig_h * scale
+
+
 # ── 幻灯片创建 ──────────────────────────────────────────────
 
 def _new_blank_slide(prs: Presentation):
@@ -475,7 +484,14 @@ def create_image_slide(prs: Presentation, caption: str, img_path: str):
         _set_font(p, FONT_CN_H2, Pt(44), bold=True)
 
     if img_path and os.path.exists(img_path):
-        slide.shapes.add_picture(img_path, Inches(2.5), Inches(1.8), Inches(8), Inches(4.8))
+        # 等比例缩放，保持在可用区域内
+        max_w, max_h = 8.0, 4.8  # 英寸
+        pic_w, pic_h = _fit_image_size(img_path, max_w, max_h)
+        # 居中放置
+        pic_left = 2.5 + (max_w - pic_w) / 2
+        pic_top = 1.8 + (max_h - pic_h) / 2
+        slide.shapes.add_picture(img_path, Inches(pic_left), Inches(pic_top),
+                                 Inches(pic_w), Inches(pic_h))
     elif img_path:
         print(f"  ⚠ 图片不存在: {img_path}")
 
@@ -557,10 +573,16 @@ def create_text_image_slide(prs: Presentation, items: list[tuple], img_path: str
             _style_table_three_line(tbl, num_rows, num_cols)
             table_top += row_height * num_rows + Inches(0.3)
 
-    # ── 右侧 1/3：图片区域 ──
+    # ── 右侧 1/3：图片区域（等比例缩放，维持原图比例）──
     if img_path and os.path.exists(img_path):
         img_left = Inches(9.2)
-        slide.shapes.add_picture(img_path, img_left, Inches(1.5), Inches(3.6), Inches(4.5))
+        max_w, max_h = 3.6, 5.5  # 英寸
+        pic_w, pic_h = _fit_image_size(img_path, max_w, max_h)
+        # 在右侧区域内居中
+        pic_left = 9.2 + (max_w - pic_w) / 2
+        pic_top = 1.5 + (max_h - pic_h) / 2
+        slide.shapes.add_picture(img_path, Inches(pic_left), Inches(pic_top),
+                                 Inches(pic_w), Inches(pic_h))
     elif img_path:
         print(f"  ⚠ 图片不存在: {img_path}")
 
