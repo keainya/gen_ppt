@@ -13,7 +13,7 @@ import sys
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.oxml.ns import qn
 from lxml import etree
 from PIL import Image
@@ -395,6 +395,22 @@ def create_content_slide(prs: Presentation, items: list[tuple]):
     # 分离文本项和表格项
     text_items = [it for it in items if it[0] != "table"]
     table_items = [it for it in items if it[0] == "table"]
+
+    # ── 特殊处理：仅有一个二级标题且无表格 → 居中显示 ──
+    if (len(text_items) == 1 and text_items[0][0] == "h2"
+            and not table_items):
+        # 文本框居中放置，水平和垂直均居中
+        tb = slide.shapes.add_textbox(
+            Inches(1.5), Inches(2.75), Inches(10.333), Inches(2.0)
+        )
+        tf = tb.text_frame
+        tf.word_wrap = True
+        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+        p = tf.paragraphs[0]
+        p.text = text_items[0][1]
+        p.alignment = PP_ALIGN.CENTER
+        _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+        return
 
     # ── 渲染文本 ──
     if text_items:
