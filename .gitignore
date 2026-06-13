@@ -2,3 +2,4 @@
 content.md
 src
 *.pptx
+__pycache__
