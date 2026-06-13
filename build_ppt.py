@@ -257,20 +257,22 @@ def parse_content(section: str) -> list[tuple]:
     return items
 
 
-def parse_image_page(section: str) -> tuple[str, str]:
-    """解析图片展示页，返回 (caption, image_path)。"""
+def parse_image_page(section: str) -> tuple[str, list[tuple[str, str]]]:
+    """解析图片展示页，返回 (caption, [(alt_text, path), ...])。"""
     caption = ""
-    image_path = ""
+    images: list[tuple[str, str]] = []
     for line in section.split("\n"):
         s = line.strip()
         if not s:
             continue
-        m = re.match(r"^!\[.*\]\((.+)\)$", s)
+        m = re.match(r"^!\[(.*)\]\((.+)\)$", s)
         if m:
-            image_path = m.group(1).strip()
+            alt = m.group(1).strip()
+            path = m.group(2).strip()
+            images.append((alt, path))
         elif not s.startswith("#"):
             caption = s
-    return caption, image_path
+    return caption, images
 
 
 def parse_text_image(section: str) -> tuple[list[tuple], str]:
@@ -485,13 +487,53 @@ def create_content_slide(prs: Presentation, items: list[tuple]):
             table_top += row_height * num_rows + Inches(0.3)
 
 
-def create_image_slide(prs: Presentation, caption: str, img_path: str):
-    """创建图片展示幻灯片。"""
+def create_image_slide(prs: Presentation, caption: str,
+                        images: list[tuple[str, str]]):
+    """创建图片展示幻灯片，支持单图/多图自动布局。
+
+    布局规则：
+    - 1 张：居中大幅展示
+    - 2 张：左右均分
+    - 3 张：上排 2 张 + 下排 1 张居中
+    - 4 张：2×2 田字格
+    - 5～6 张：3 列网格，最多 2 行
+    - 超过 6 张：仅取前 6 张并警告
+    """
     slide = _new_blank_slide(prs)
     _set_background(slide, BG_CONTENT)
 
+    # 过滤存在的图片
+    valid = [(alt, p) for alt, p in images if os.path.exists(p)]
+    for alt, p in images:
+        if not os.path.exists(p):
+            print(f"  ⚠ 图片不存在: {p}")
+
+    MAX_IMAGES = 6
+    if len(valid) > MAX_IMAGES:
+        print(f"  ⚠ 图片过多 ({len(valid)} 张)，仅显示前 {MAX_IMAGES} 张")
+        valid = valid[:MAX_IMAGES]
+
+    if not valid:
+        if caption:
+            tb = slide.shapes.add_textbox(
+                Inches(1), Inches(2.5), Inches(11.333), Inches(2.5))
+            tf = tb.text_frame
+            tf.word_wrap = True
+            tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+            p = tf.paragraphs[0]
+            p.text = caption
+            p.alignment = PP_ALIGN.CENTER
+            _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+        return
+
+    n = len(valid)
+
+    # ── 标题区域 ──
+    CAP_TOP = 0.3
+    CAP_H = 0.9
     if caption:
-        tb = slide.shapes.add_textbox(Inches(1), Inches(0.5), Inches(11.333), Inches(1))
+        tb = slide.shapes.add_textbox(
+            Inches(1), Inches(CAP_TOP), Inches(11.333), Inches(CAP_H))
         tf = tb.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
@@ -499,17 +541,102 @@ def create_image_slide(prs: Presentation, caption: str, img_path: str):
         p.alignment = PP_ALIGN.CENTER
         _set_font(p, FONT_CN_H2, Pt(44), bold=True)
 
-    if img_path and os.path.exists(img_path):
-        # 等比例缩放，保持在可用区域内
-        max_w, max_h = 8.0, 4.8  # 英寸
-        pic_w, pic_h = _fit_image_size(img_path, max_w, max_h)
-        # 居中放置
-        pic_left = 2.5 + (max_w - pic_w) / 2
-        pic_top = 1.8 + (max_h - pic_h) / 2
-        slide.shapes.add_picture(img_path, Inches(pic_left), Inches(pic_top),
-                                 Inches(pic_w), Inches(pic_h))
-    elif img_path:
-        print(f"  ⚠ 图片不存在: {img_path}")
+    # ── 图片可用区域 ──
+    MARGIN = 0.8
+    GAP = 0.15
+    area_left = MARGIN
+    area_top = CAP_TOP + CAP_H + 0.15 if caption else 0.5
+    area_w = 13.333 - 2 * MARGIN
+    area_h = 7.5 - area_top - 0.3
+
+    if n == 1:
+        _place_single_image(slide, valid[0], area_left, area_top, area_w, area_h)
+    elif n == 2:
+        _place_image_grid(slide, valid, area_left, area_top, area_w, area_h,
+                          cols=2, rows=1, gap=GAP)
+    elif n == 3:
+        row_h = (area_h - GAP) / 2
+        col_w2 = (area_w - GAP) / 2
+        # 上排 2 张
+        for ci in range(2):
+            cx = area_left + ci * (col_w2 + GAP)
+            _place_cell(slide, valid[ci], cx, area_top, col_w2, row_h)
+        # 下排 1 张居中
+        col_w1 = area_w * 0.5
+        cx = area_left + (area_w - col_w1) / 2
+        _place_cell(slide, valid[2], cx, area_top + row_h + GAP, col_w1, row_h)
+    elif n == 4:
+        _place_image_grid(slide, valid, area_left, area_top, area_w, area_h,
+                          cols=2, rows=2, gap=GAP)
+    else:  # 5～6
+        _place_image_grid(slide, valid, area_left, area_top, area_w, area_h,
+                          cols=3, rows=2, gap=GAP)
+
+
+def _place_cell(slide, image: tuple[str, str],
+                left: float, top: float, cell_w: float, cell_h: float):
+    """在指定单元格内居中放置一张图片，alt 文本显示在图片下方。"""
+    alt_text, path = image
+    SUB_H = 0.28 if alt_text else 0.0
+    img_h = cell_h - SUB_H - 0.04
+
+    pic_w, pic_h = _fit_image_size(path, cell_w - 0.08, img_h - 0.08)
+    pic_left = left + (cell_w - pic_w) / 2
+    pic_top = top + (img_h - pic_h) / 2
+    slide.shapes.add_picture(path, Inches(pic_left), Inches(pic_top),
+                             Inches(pic_w), Inches(pic_h))
+
+    if alt_text:
+        tb = slide.shapes.add_textbox(
+            Inches(left), Inches(top + cell_h - SUB_H),
+            Inches(cell_w), Inches(SUB_H))
+        tf = tb.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = alt_text
+        p.alignment = PP_ALIGN.CENTER
+        _set_font(p, FONT_CN_BODY, Pt(14))
+
+
+def _place_single_image(slide, image: tuple[str, str],
+                        left: float, top: float, area_w: float, area_h: float):
+    """单图居中，保留原有 8.0×4.8 的舒适展示区域。"""
+    alt_text, path = image
+    max_w, max_h = 8.0, 4.8
+    pic_w, pic_h = _fit_image_size(path, max_w, max_h)
+    pic_left = left + (area_w - pic_w) / 2
+    pic_top = top + (area_h - pic_h) / 2
+    slide.shapes.add_picture(path, Inches(pic_left), Inches(pic_top),
+                             Inches(pic_w), Inches(pic_h))
+
+    if alt_text:
+        sub_top = pic_top + pic_h + 0.1
+        tb = slide.shapes.add_textbox(
+            Inches(pic_left), Inches(sub_top),
+            Inches(pic_w), Inches(0.35))
+        tf = tb.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = alt_text
+        p.alignment = PP_ALIGN.CENTER
+        _set_font(p, FONT_CN_BODY, Pt(16))
+
+
+def _place_image_grid(slide, images: list[tuple[str, str]],
+                      left: float, top: float, area_w: float, area_h: float,
+                      cols: int, rows: int, gap: float):
+    """将图片按 cols×rows 网格排列。"""
+    col_w = (area_w - (cols - 1) * gap) / cols
+    row_h = (area_h - (rows - 1) * gap) / rows
+
+    for idx, img in enumerate(images):
+        if idx >= cols * rows:
+            break
+        r = idx // cols
+        c = idx % cols
+        cx = left + c * (col_w + gap)
+        cy = top + r * (row_h + gap)
+        _place_cell(slide, img, cx, cy, col_w, row_h)
 
 
 def create_text_image_slide(prs: Presentation, items: list[tuple], img_path: str):
@@ -645,8 +772,8 @@ def build(md_path: str = INPUT_FILE, output_path: str = OUTPUT_FILE):
             title, speaker = parse_cover(sec)
             create_cover_slide(prs, title, speaker)
         elif pt == "image":
-            caption, img_path = parse_image_page(sec)
-            create_image_slide(prs, caption, img_path)
+            caption, images = parse_image_page(sec)
+            create_image_slide(prs, caption, images)
         elif pt == "text_image":
             items, img_path = parse_text_image(sec)
             create_text_image_slide(prs, items, img_path)
