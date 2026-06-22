@@ -17,6 +17,18 @@ user-invocable: true
 | `content.md` | 结构化 Markdown 输入文件 |
 | `src/cover.png` | 封面及结束页背景图 |
 | `src/background.png` | 内容页及图片页背景图 |
+| `src/` | 长期资源目录，存放背景图及复用图片 |
+| `tmp/` | 临时资源目录，存放一次性使用的图片 |
+| `clean.py` | 清理脚本，清除生成文件及 `tmp/` 中临时资源 |
+
+## 资源目录：src vs tmp
+
+| 目录 | 用途 | clean.py 行为 |
+|------|------|---------------|
+| `src/` | 长期资源（背景图、复用的图片素材） | 保留 `.gitkeep`、`cover.png`、`background.png`，其余清除 |
+| `tmp/` | 临时资源（一次性使用的图片） | 保留 `.gitkeep`，其余全部清除 |
+
+> 图片引用路径相对于项目根目录，`src/photo.png` 和 `tmp/photo.png` 均可正常编译。
 
 ## 运行方式
 
@@ -85,12 +97,19 @@ python build_ppt.py
 ![](src/diagram.png)
 ```
 
+图片也可放在 `tmp/` 目录（临时资源）：
+
+```markdown
+临时截图
+![](tmp/screenshot.png)
+```
+
 多图示例：
 
 ```markdown
 流程图对比
 ![方案A](src/flow_a.png)
-![方案B](src/flow_b.png)
+![方案B](tmp/flow_b.png)
 ```
 
 ### 图配文页（尽可能少用）
@@ -105,6 +124,8 @@ python build_ppt.py
 
 ![](src/architecture.png)
 ```
+
+> 图配文页的图片同样支持 `src/` 或 `tmp/` 路径。
 
 ### 结束页
 
