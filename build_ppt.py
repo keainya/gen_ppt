@@ -55,6 +55,56 @@ def _set_font(p, cn_font: str, size, bold: bool = False):
     ea.set("typeface", cn_font)
 
 
+def _clear_paragraph(paragraph):
+    """清除段落中所有 run 元素。"""
+    p_elem = paragraph._p
+    for tag in ("a:r", "a:fld", "a:br"):
+        for el in p_elem.findall(qn(tag)):
+            p_elem.remove(el)
+
+
+def _set_run_font(run, cn_font: str, size, bold: bool = False):
+    """设置单个 run 的字体属性。"""
+    run.font.name = FONT_LATIN
+    run.font.size = size
+    run.font.bold = bold
+    run.font.color.rgb = DARK
+    rPr = run._r.get_or_add_rPr()
+    ea = rPr.find(qn("a:ea"))
+    if ea is None:
+        ea = etree.SubElement(rPr, qn("a:ea"))
+    ea.set("typeface", cn_font)
+
+
+def _set_paragraph_text(paragraph, text: str, cn_font: str, size,
+                        bold_default: bool = False):
+    """设置段落文本，支持 **加粗** 行内语法。"""
+    _clear_paragraph(paragraph)
+    # 按 **...** 分割，捕获分隔符
+    parts = re.split(r"(\*\*.*?\*\*)", text)
+    for part in parts:
+        if not part:
+            continue
+        if part.startswith("**") and part.endswith("**"):
+            inner = part[2:-2]
+            if inner:
+                run = paragraph.add_run()
+                run.text = inner
+                _set_run_font(run, cn_font, size, bold=True)
+        else:
+            run = paragraph.add_run()
+            run.text = part
+            _set_run_font(run, cn_font, size, bold=bold_default)
+
+
+def _set_cell_text(cell, text: str, cn_font: str, size,
+                   bold_default: bool = False):
+    """设置表格单元格文本，支持 **加粗** 行内语法。"""
+    tf = cell.text_frame
+    p = tf.paragraphs[0]
+    _set_paragraph_text(p, text, cn_font, size, bold_default)
+
+
 def _set_cell_font(cell, cn_font: str, size, bold: bool = False):
     """设置表格单元格的中英文字体、字号和粗细。"""
     for paragraph in cell.text_frame.paragraphs:
@@ -373,17 +423,15 @@ def create_cover_slide(prs: Presentation, title: str, speaker: str):
         tf = tb.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.text = title
         p.alignment = PP_ALIGN.CENTER
-        _set_font(p, FONT_CN_H1, Pt(66), bold=True)
+        _set_paragraph_text(p, title, FONT_CN_H1, Pt(66), bold_default=True)
 
     if speaker:
         tb = slide.shapes.add_textbox(Inches(1.5), Inches(4.8), Inches(10.333), Inches(1))
         tf = tb.text_frame
         p = tf.paragraphs[0]
-        p.text = speaker
         p.alignment = PP_ALIGN.CENTER
-        _set_font(p, FONT_CN_H2, Pt(44))
+        _set_paragraph_text(p, speaker, FONT_CN_H2, Pt(44))
 
 
 def create_content_slide(prs: Presentation, items: list[tuple]):
@@ -409,9 +457,8 @@ def create_content_slide(prs: Presentation, items: list[tuple]):
         tf.word_wrap = True
         tf.vertical_anchor = MSO_ANCHOR.MIDDLE
         p = tf.paragraphs[0]
-        p.text = text_items[0][1]
         p.alignment = PP_ALIGN.CENTER
-        _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+        _set_paragraph_text(p, text_items[0][1], FONT_CN_H2, Pt(44), bold_default=True)
         return
 
     # ── 渲染文本 ──
@@ -429,20 +476,16 @@ def create_content_slide(prs: Presentation, items: list[tuple]):
             t = item[0]
 
             if t == "h2":
-                p.text = item[1]
-                _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+                _set_paragraph_text(p, item[1], FONT_CN_H2, Pt(44), bold_default=True)
                 p.space_after = Pt(24)
             elif t == "ordered":
-                p.text = f"{item[2]}. {item[1]}"
-                _set_font(p, FONT_CN_BODY, Pt(32))
+                _set_paragraph_text(p, f"{item[2]}. {item[1]}", FONT_CN_BODY, Pt(32))
                 p.space_after = Pt(12)
             elif t == "unordered":
-                p.text = f"• {item[1]}"
-                _set_font(p, FONT_CN_BODY, Pt(32))
+                _set_paragraph_text(p, f"• {item[1]}", FONT_CN_BODY, Pt(32))
                 p.space_after = Pt(12)
             else:  # plain
-                p.text = item[1]
-                _set_font(p, FONT_CN_BODY, Pt(32))
+                _set_paragraph_text(p, item[1], FONT_CN_BODY, Pt(32))
                 p.space_after = Pt(12)
 
     # ── 渲染表格 ──
@@ -469,16 +512,14 @@ def create_content_slide(prs: Presentation, items: list[tuple]):
             # 表头行
             for ci, header_text in enumerate(headers):
                 cell = tbl.cell(0, ci)
-                cell.text = header_text
-                _set_cell_font(cell, FONT_CN_H2, Pt(32), bold=True)
+                _set_cell_text(cell, header_text, FONT_CN_H2, Pt(32), bold_default=True)
 
             # 数据行
             for ri, row in enumerate(rows):
                 for ci, cell_text in enumerate(row):
                     if ci < num_cols:
                         cell = tbl.cell(ri + 1, ci)
-                        cell.text = cell_text
-                        _set_cell_font(cell, FONT_CN_BODY, Pt(32))
+                        _set_cell_text(cell, cell_text, FONT_CN_BODY, Pt(32))
 
             # 应用三段式样式（无填充、仅三条横线）
             _style_table_three_line(tbl, num_rows, num_cols)
@@ -521,9 +562,8 @@ def create_image_slide(prs: Presentation, caption: str,
             tf.word_wrap = True
             tf.vertical_anchor = MSO_ANCHOR.MIDDLE
             p = tf.paragraphs[0]
-            p.text = caption
             p.alignment = PP_ALIGN.CENTER
-            _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+            _set_paragraph_text(p, caption, FONT_CN_H2, Pt(44), bold_default=True)
         return
 
     n = len(valid)
@@ -537,9 +577,8 @@ def create_image_slide(prs: Presentation, caption: str,
         tf = tb.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.text = caption
         p.alignment = PP_ALIGN.CENTER
-        _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+        _set_paragraph_text(p, caption, FONT_CN_H2, Pt(44), bold_default=True)
 
     # ── 图片可用区域 ──
     MARGIN = 0.8
@@ -593,9 +632,8 @@ def _place_cell(slide, image: tuple[str, str],
         tf = tb.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.text = alt_text
         p.alignment = PP_ALIGN.CENTER
-        _set_font(p, FONT_CN_BODY, Pt(14))
+        _set_paragraph_text(p, alt_text, FONT_CN_BODY, Pt(14))
 
 
 def _place_single_image(slide, image: tuple[str, str],
@@ -617,9 +655,8 @@ def _place_single_image(slide, image: tuple[str, str],
         tf = tb.text_frame
         tf.word_wrap = True
         p = tf.paragraphs[0]
-        p.text = alt_text
         p.alignment = PP_ALIGN.CENTER
-        _set_font(p, FONT_CN_BODY, Pt(16))
+        _set_paragraph_text(p, alt_text, FONT_CN_BODY, Pt(16))
 
 
 def _place_image_grid(slide, images: list[tuple[str, str]],
@@ -666,20 +703,16 @@ def create_text_image_slide(prs: Presentation, items: list[tuple], img_path: str
             t = item[0]
 
             if t == "h2":
-                p.text = item[1]
-                _set_font(p, FONT_CN_H2, Pt(44), bold=True)
+                _set_paragraph_text(p, item[1], FONT_CN_H2, Pt(44), bold_default=True)
                 p.space_after = Pt(24)
             elif t == "ordered":
-                p.text = f"{item[2]}. {item[1]}"
-                _set_font(p, FONT_CN_BODY, Pt(32))
+                _set_paragraph_text(p, f"{item[2]}. {item[1]}", FONT_CN_BODY, Pt(32))
                 p.space_after = Pt(12)
             elif t == "unordered":
-                p.text = f"• {item[1]}"
-                _set_font(p, FONT_CN_BODY, Pt(32))
+                _set_paragraph_text(p, f"• {item[1]}", FONT_CN_BODY, Pt(32))
                 p.space_after = Pt(12)
             else:  # plain
-                p.text = item[1]
-                _set_font(p, FONT_CN_BODY, Pt(32))
+                _set_paragraph_text(p, item[1], FONT_CN_BODY, Pt(32))
                 p.space_after = Pt(12)
 
     if table_items:
@@ -703,15 +736,13 @@ def create_text_image_slide(prs: Presentation, items: list[tuple], img_path: str
 
             for ci, header_text in enumerate(headers):
                 cell = tbl.cell(0, ci)
-                cell.text = header_text
-                _set_cell_font(cell, FONT_CN_H2, Pt(32), bold=True)
+                _set_cell_text(cell, header_text, FONT_CN_H2, Pt(32), bold_default=True)
 
             for ri, row in enumerate(rows):
                 for ci, cell_text in enumerate(row):
                     if ci < num_cols:
                         cell = tbl.cell(ri + 1, ci)
-                        cell.text = cell_text
-                        _set_cell_font(cell, FONT_CN_BODY, Pt(32))
+                        _set_cell_text(cell, cell_text, FONT_CN_BODY, Pt(32))
 
             _style_table_three_line(tbl, num_rows, num_cols)
             table_top += row_height * num_rows + Inches(0.3)
