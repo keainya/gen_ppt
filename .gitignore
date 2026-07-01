@@ -1,5 +1,7 @@
 .venv
 content.md
-src
 *.pptx
 __pycache__
+build/
+dist/
+*.spec

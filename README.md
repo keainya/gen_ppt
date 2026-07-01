@@ -117,15 +117,31 @@ PPT 支持以下 4 种页面类型：
 - 语言：Python
 - PPT 生成：`python-pptx` 库
 
+## 打包为独立可执行文件
+
+使用 `package.py` 可将 `build_ppt.py` 打包为免安装的单文件程序：
+
+```bash
+python package.py              # 为当前平台打包
+python package.py --clean      # 先清理再打包
+```
+
+- **Windows** → 生成 `dist/build_ppt.exe`
+- **Linux**   → 生成 `dist/build_ppt`
+
+> PyInstaller 不支持跨平台编译，需在目标 OS 上运行本脚本。
+
 ## 文件结构
 
 ```
 gen_ppt/
-├── build_ppt.py       # 主构建脚本，读取 content.md 生成 .pptx
+├── build_ppt.py       # 主构建脚本，读取 Markdown 生成 .pptx
+├── package.py         # 打包脚本，生成独立可执行文件
 ├── content.md         # 输入的结构化 Markdown 内容
 ├── cover.png          # 封面背景图（与 build_ppt.py 同目录）
 ├── background.png     # 内容页/图片展示页背景图（与 build_ppt.py 同目录）
 ├── src/               # 静态资源目录（图片等素材）
 ├── tmp/               # 临时资源目录
+├── dist/              # 打包输出目录（.exe / Linux binary）
 └── README.md          # 本文件
 ```

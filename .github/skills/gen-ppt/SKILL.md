@@ -20,6 +20,7 @@ user-invocable: true
 | `src/` | 长期资源目录，存放复用图片素材 |
 | `tmp/` | 临时资源目录，存放一次性使用的图片 |
 | `clean.py` | 清理脚本，清除生成文件及 `tmp/` 中临时资源 |
+| `package.py` | 打包脚本，生成独立可执行文件（Windows .exe / Linux binary） |
 
 ## 资源目录：src vs tmp
 
@@ -42,6 +43,18 @@ python build_ppt.py path/to/slides.md
 
 - 未指定文件时，默认读取 `content.md`
 - 若 `content.md` 也不存在，报错提示缺少文件
+
+## 打包为独立可执行文件
+
+```bash
+python package.py              # 为当前平台打包
+python package.py --clean      # 先清理再打包
+```
+
+- Windows → `dist/build_ppt.exe`
+- Linux   → `dist/build_ppt`
+- 首次运行自动安装 PyInstaller
+- PyInstaller 不支持跨平台编译，需在目标 OS 上运行
 
 ## content.md 结构化格式
 
