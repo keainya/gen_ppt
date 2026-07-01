@@ -184,6 +184,27 @@ def _set_background(slide, image_path: str):
 
 # ── Markdown 解析 ───────────────────────────────────────────
 
+def parse_metadata(md_text: str) -> dict[str, str]:
+    """从 Markdown 文本中解析元数据。
+
+    支持的注释格式（须在第一个 --- 之前）：
+        <!-- cover: path/to/cover.png -->
+        <!-- background: path/to/bg.png -->
+
+    返回 {"cover": "...", "background": "..."}，未指定则为空。
+    """
+    meta: dict[str, str] = {}
+    for line in md_text.split("\n"):
+        s = line.strip()
+        # 遇到第一个页面分隔符即停止
+        if s == "---":
+            break
+        m = re.match(r"<!--\s*(\w+)\s*:\s*(.+?)\s*-->", s)
+        if m:
+            meta[m.group(1)] = m.group(2).strip()
+    return meta
+
+
 def split_sections(md_text: str) -> list[str]:
     """按行首的 --- 分隔为多个页面段落。"""
     lines = md_text.split("\n")
@@ -782,15 +803,30 @@ def create_end_slide(prs: Presentation):
 
 def build(md_path: str = INPUT_FILE):
     """读取 Markdown 文件，在同目录生成同名 .pptx。"""
+    global BG_COVER, BG_CONTENT
+
     if not os.path.exists(md_path):
         print(f"错误：找不到输入文件 {md_path}")
         sys.exit(1)
 
     md_abs = os.path.abspath(md_path)
+    md_dir = os.path.dirname(md_abs)
     output_path = os.path.splitext(md_abs)[0] + ".pptx"
 
     with open(md_path, "r", encoding="utf-8") as f:
         md_text = f.read()
+
+    # 解析元数据，覆盖默认背景图
+    meta = parse_metadata(md_text)
+    def _resolve_bg(key: str, default: str) -> str:
+        """解析背景图路径：元数据优先，相对路径基于 md 文件目录。"""
+        path = meta.get(key) or default
+        if not os.path.isabs(path):
+            path = os.path.normpath(os.path.join(md_dir, path))
+        return path
+
+    BG_COVER = _resolve_bg("cover", "cover.png")
+    BG_CONTENT = _resolve_bg("background", "background.png")
 
     sections = split_sections(md_text)
     if not sections:

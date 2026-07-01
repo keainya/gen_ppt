@@ -138,8 +138,8 @@ python build_ppt.py path/to/slides.md
 
 ## 页面类型速查
 
-| 类型 | 检测规则 | 背景图 |
-|------|---------|--------|
+| 类型 | 检测规则 | 背景图（可通过元数据覆盖） |
+|------|---------|---------------------------|
 | 封面 | `# ` 一级标题 | `cover.png` |
 | 内容 | 列表、表格、纯文本等 | `background.png` |
 | 图片 | `![](...)` 图片引用（无结构化文字） | `background.png` |
@@ -147,3 +147,21 @@ python build_ppt.py path/to/slides.md
 | 结束 | 自动追加 | `cover.png` |
 
 背景图缺失时回退为纯白背景。
+
+## 元数据（可选）
+
+在第一个 `---` 之前，通过 HTML 注释指定背景图，覆盖默认值：
+
+```markdown
+<!-- cover: custom_cover.png -->
+<!-- background: custom_bg.png -->
+
+# 标题
+## 演讲人
+---
+```
+
+- `cover`：封面及结束页背景图
+- `background`：内容页、图片页、图配文页背景图
+- 路径相对于 Markdown 文件所在目录
+- 未指定时使用默认值 `cover.png` / `background.png`
