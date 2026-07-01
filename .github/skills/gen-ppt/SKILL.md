@@ -44,18 +44,6 @@ python build_ppt.py path/to/slides.md
 - 未指定文件时，默认读取 `content.md`
 - 若 `content.md` 也不存在，报错提示缺少文件
 
-## 打包为独立可执行文件
-
-```bash
-python package.py              # 为当前平台打包
-python package.py --clean      # 先清理再打包
-```
-
-- Windows → `dist/build_ppt.exe`
-- Linux   → `dist/build_ppt`
-- 首次运行自动安装 PyInstaller
-- PyInstaller 不支持跨平台编译，需在目标 OS 上运行
-
 ## content.md 结构化格式
 
 ### 页面分隔
