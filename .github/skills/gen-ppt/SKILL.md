@@ -15,9 +15,9 @@ user-invocable: true
 |------|------|
 | `build_ppt.py` | 主构建脚本，读取 content.md 生成 .pptx |
 | `content.md` | 结构化 Markdown 输入文件 |
-| `src/cover.png` | 封面及结束页背景图 |
-| `src/background.png` | 内容页及图片页背景图 |
-| `src/` | 长期资源目录，存放背景图及复用图片 |
+| `cover.png` | 封面及结束页背景图（与 build_ppt.py 同目录） |
+| `background.png` | 内容页及图片页背景图（与 build_ppt.py 同目录） |
+| `src/` | 长期资源目录，存放复用图片素材 |
 | `tmp/` | 临时资源目录，存放一次性使用的图片 |
 | `clean.py` | 清理脚本，清除生成文件及 `tmp/` 中临时资源 |
 
@@ -25,10 +25,10 @@ user-invocable: true
 
 | 目录 | 用途 | clean.py 行为 |
 |------|------|---------------|
-| `src/` | 长期资源（背景图、复用的图片素材） | 保留 `.gitkeep`、`cover.png`、`background.png`，其余清除 |
+| `src/` | 长期资源（复用的图片素材） | 保留 `.gitkeep`，其余清除 |
 | `tmp/` | 临时资源（一次性使用的图片） | 保留 `.gitkeep`，其余全部清除 |
 
-> 图片引用路径相对于项目根目录，`src/photo.png` 和 `tmp/photo.png` 均可正常编译。
+> 背景图 `cover.png` 和 `background.png` 位于项目根目录（与 `build_ppt.py` 同目录）。图片引用路径相对于项目根目录，支持任意路径（如 `src/photo.png`、`tmp/photo.png`、`images/diagram.png` 等），不限制目录。
 
 ## 运行方式
 
@@ -135,10 +135,10 @@ python build_ppt.py
 
 | 类型 | 检测规则 | 背景图 |
 |------|---------|--------|
-| 封面 | `# ` 一级标题 | `src/cover.png` |
-| 内容 | 列表、表格、纯文本等 | `src/background.png` |
-| 图片 | `![](...)` 图片引用（无结构化文字） | `src/background.png` |
-| 图配文 | 结构化文字 + 图片引用 | `src/background.png` |
-| 结束 | 自动追加 | `src/cover.png` |
+| 封面 | `# ` 一级标题 | `cover.png` |
+| 内容 | 列表、表格、纯文本等 | `background.png` |
+| 图片 | `![](...)` 图片引用（无结构化文字） | `background.png` |
+| 图配文 | 结构化文字 + 图片引用 | `background.png` |
+| 结束 | 自动追加 | `cover.png` |
 
 背景图缺失时回退为纯白背景。

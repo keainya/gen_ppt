@@ -2,7 +2,7 @@
 """Clean script — 清理项目中的生成文件和临时内容。
 
 功能：
-1. 清除 src/ 中除了 .gitkeep, background.png, cover.png 以外的所有文件
+1. 清除 src/ 中除了 .gitkeep 以外的所有文件
 2. 清除 tmp/ 中除了 .gitkeep 以外的所有文件
 3. 清空 content.md
 4. 删除 output.pptx
@@ -24,7 +24,7 @@ def clean_src():
 		print(f"[跳过] src 目录不存在: {SRC_DIR}")
 		return
 
-	keep_files = {".gitkeep", "background.png", "cover.png"}
+	keep_files = {".gitkeep"}
 	removed = []
 	for entry in os.listdir(SRC_DIR):
 		if entry in keep_files:

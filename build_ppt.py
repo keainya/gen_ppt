@@ -22,8 +22,8 @@ from PIL import Image
 
 SLIDE_WIDTH  = Inches(13.333)   # 16:9 宽屏
 SLIDE_HEIGHT = Inches(7.5)
-BG_COVER     = "src/cover.png"       # 封面背景
-BG_CONTENT   = "src/background.png"       # 内容页 / 图片页背景
+BG_COVER     = "cover.png"       # 封面背景
+BG_CONTENT   = "background.png"       # 内容页 / 图片页背景
 INPUT_FILE   = "content.md"
 OUTPUT_FILE  = "output.pptx"
 
