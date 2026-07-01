@@ -33,10 +33,15 @@ user-invocable: true
 ## 运行方式
 
 ```bash
-./build_ppt.py
-# 或
+# 编译 content.md（默认）
 python build_ppt.py
+
+# 编译指定文件
+python build_ppt.py path/to/slides.md
 ```
+
+- 未指定文件时，默认读取 `content.md`
+- 若 `content.md` 也不存在，报错提示缺少文件
 
 ## content.md 结构化格式
 

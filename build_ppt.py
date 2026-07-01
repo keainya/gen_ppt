@@ -2,8 +2,12 @@
 """
 build_ppt.py — 将结构化 Markdown 编译为 PPT 演示文稿。
 
-读取 content.md，按 --- 分隔页面，识别封面页、内容页、图片展示页，
-生成 output.pptx。
+用法：
+    python build_ppt.py [markdown_file]
+
+读取指定的 Markdown 文件，按 --- 分隔页面，识别封面页、内容页、
+图片展示页，生成 output.pptx。若未指定文件，默认读取 content.md；
+若 content.md 也不存在，则报错退出。
 """
 
 import os
@@ -25,7 +29,6 @@ SLIDE_HEIGHT = Inches(7.5)
 BG_COVER     = "cover.png"       # 封面背景
 BG_CONTENT   = "background.png"       # 内容页 / 图片页背景
 INPUT_FILE   = "content.md"
-OUTPUT_FILE  = "output.pptx"
 
 WHITE  = RGBColor(0xFF, 0xFF, 0xFF)
 DARK   = RGBColor(0x33, 0x33, 0x33)
@@ -777,11 +780,14 @@ def create_end_slide(prs: Presentation):
     _set_font(p, FONT_CN_H1, Pt(66), bold=True)
 
 
-def build(md_path: str = INPUT_FILE, output_path: str = OUTPUT_FILE):
-    """读取 Markdown 文件，生成 .pptx。"""
+def build(md_path: str = INPUT_FILE):
+    """读取 Markdown 文件，在同目录生成同名 .pptx。"""
     if not os.path.exists(md_path):
         print(f"错误：找不到输入文件 {md_path}")
         sys.exit(1)
+
+    md_abs = os.path.abspath(md_path)
+    output_path = os.path.splitext(md_abs)[0] + ".pptx"
 
     with open(md_path, "r", encoding="utf-8") as f:
         md_text = f.read()
@@ -821,4 +827,12 @@ def build(md_path: str = INPUT_FILE, output_path: str = OUTPUT_FILE):
 
 
 if __name__ == "__main__":
-    build()
+    if len(sys.argv) > 1:
+        md_path = sys.argv[1]
+    elif os.path.exists(INPUT_FILE):
+        md_path = INPUT_FILE
+    else:
+        print(f"错误：未指定输入文件，且默认文件 {INPUT_FILE} 不存在")
+        print(f"用法：python build_ppt.py [markdown_file]")
+        sys.exit(1)
+    build(md_path)
