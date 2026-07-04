@@ -1,168 +1,156 @@
 ---
 name: gen-ppt
-description: '将结构化 Markdown 编译成 PPT。Use when: 生成演示文稿、制作PPT、编译markdown到pptx、写content.md、修改PPT样式或字体、添加页面类型、调整build_ppt.py。'
-argument-hint: '[task description for gen_ppt]'
+description: 'Generate PowerPoint (PPTX) presentations from structured Markdown. Use when: user asks to create a PPT, PowerPoint, slide deck, 演示文稿, PPT, or presentation from Markdown/outline/content; generating slides with cover, content pages, image gallery, text+image layout, tables; converting structured documents to .pptx format.'
+argument-hint: '[markdown_file] — optional, defaults to content.md'
 user-invocable: true
 ---
 
-# gen_ppt — 结构化 Markdown 编译为 PPT
+# Gen PPT — Markdown to PowerPoint
 
-将结构化的 `content.md` 编译为 `output.pptx`，支持 5 种页面类型及自动结束页。
+将结构化 Markdown 编译为 PowerPoint (.pptx) 演示文稿。使用 `python-pptx` 库，支持封面页、内容页、图片展示页、图配文页和结束页共 5 种页面类型，极简样式，侧重内容清晰呈现。
 
-## 项目文件
+## When to Use
 
-| 文件 | 作用 |
-|------|------|
-| `build_ppt.py` | 主构建脚本，读取 content.md 生成 .pptx |
-| `content.md` | 结构化 Markdown 输入文件 |
-| `cover.png` | 封面及结束页背景图（与 build_ppt.py 同目录） |
-| `background.png` | 内容页及图片页背景图（与 build_ppt.py 同目录） |
-| `src/` | 长期资源目录，存放复用图片素材 |
-| `tmp/` | 临时资源目录，存放一次性使用的图片 |
-| `clean.py` | 清理脚本，清除生成文件及 `tmp/` 中临时资源 |
-| `package.py` | 打包脚本，生成独立可执行文件（Windows .exe / Linux binary） |
+- 用户要求根据 Markdown 内容生成 PPT/演示文稿
+- 需要将结构化文档（含标题、列表、表格、图片）转为幻灯片
+- 快速制作演示文稿，无需复杂排版和动画
 
-## 资源目录：src vs tmp
+## Page Types & Markdown Syntax
 
-| 目录 | 用途 | clean.py 行为 |
-|------|------|---------------|
-| `src/` | 长期资源（复用的图片素材） | 保留 `.gitkeep`，其余清除 |
-| `tmp/` | 临时资源（一次性使用的图片） | 保留 `.gitkeep`，其余全部清除 |
+### 封面页 (Cover)
+- `# 标题` → PPT 标题（宋体 66pt）
+- `## 演讲人` → 演讲人姓名（宋体 44pt）
+- 背景图使用 `cover.png`
 
-> 背景图 `cover.png` 和 `background.png` 位于项目根目录（与 `build_ppt.py` 同目录）。图片引用路径相对于项目根目录，支持任意路径（如 `src/photo.png`、`tmp/photo.png`、`images/diagram.png` 等），不限制目录。
+### 内容页 (Content)
+- `## 标题` → 二级标题（宋体 44pt）
+- `1. 项目` → 有序列表
+- `- 项目` / `* 项目` → 无序列表
+- Markdown 表格 → 三段式表格（无底色、无竖线，仅顶/中/底三条横线）
+- 若页面**仅**包含一个 `## 标题`（无其他文字或表格），标题在幻灯片中水平和垂直居中
+- 背景图使用 `background.png`
 
-## 运行方式
+### 图片展示页 (Image)
+- 每行一个 `![说明文字](图片路径)`，最多 6 张
+- 自动布局：1 张居中、2 张左右、3 张上 2 下 1、4 张 2×2、5~6 张 3 列网格
+- 超过 6 张仅取前 6 张并输出警告
+- 背景图使用 `background.png`
 
-```bash
-# 编译 content.md（默认）
-python build_ppt.py
+### 图配文页 (Text + Image)（尽量少用！）
+- 左侧 2/3 为文字区域（支持二级标题、列表、表格）
+- 右侧 1/3 为单张图片
+- 页面同时包含结构化内容和图片引用时自动识别
+- 背景图使用 `background.png`
 
-# 编译指定文件
-python build_ppt.py path/to/slides.md
-```
+### 结束页 (End)
+- 自动生成，无需在 Markdown 中编写
+- 内容："谢谢"（宋体 66pt，居中）
+- 背景图使用 `cover.png`
 
-- 未指定文件时，默认读取 `content.md`
-- 若 `content.md` 也不存在，报错提示缺少文件
+## Page Separation
 
-## content.md 结构化格式
-
-### 页面分隔
-
-使用三个减号 `---` 作为页面分隔符。两个 `---` 之间的内容属于同一页 PPT（第一页前可省略）。
-
-### 封面页
-
-使用一级标题 `# ` + 二级标题 `## `，自动识别为封面：
+使用 `---`（三个减号）作为页面分隔符。第一个 `---` 之前可放置元数据。
 
 ```markdown
+<!-- cover: slides/cover.png -->
+<!-- background: slides/bg.png -->
+
 # 演示文稿标题
 ## 演讲人姓名
+
 ---
-```
 
-### 内容页
-
-支持二级标题 `## `、有序列表 `1. `、无序列表 `- `、纯文本、Markdown 表格：
-
-```markdown
-## 小节标题
+## 第一个内容页标题
 - 要点一
 - 要点二
-1. 步骤一
-2. 步骤二
 
-| 列A | 列B |
-|-----|-----|
-| 值1 | 值2 |
-```
-
-**特殊布局**：若该页仅包含一个二级标题，无其他文字或表格，则该标题在幻灯片中水平和垂直居中显示。
-
-```markdown
-## 居中标题
 ---
+
+![图1](images/chart1.png)
+![图2](images/chart2.png)
 ```
 
-### 图片展示页
+## Metadata (Optional)
 
-图片说明文字（普通文本） + Markdown 图片引用，支持任意张图片，自动选择布局：
+在第一个 `---` 之前通过 HTML 注释指定背景图：
 
-| 张数 | 布局 |
-|------|------|
-| 1 | 居中大幅展示 |
-| 2 | 左右均分 |
-| 3 | 上排 2 张 + 下排 1 张居中 |
-| 4 | 2×2 田字格 |
-| 5～6 | 3 列网格（最多 2 行） |
-| ≥7 | 仅取前 6 张并警告 |
-
-每张图可附带 alt 文本（`![说明](path)`），渲染为图片下方的小号说明。
-
-```markdown
-架构示意图
-![](src/diagram.png)
-```
-
-图片也可放在 `tmp/` 目录（临时资源）：
-
-```markdown
-临时截图
-![](tmp/screenshot.png)
-```
-
-多图示例：
-
-```markdown
-流程图对比
-![方案A](src/flow_a.png)
-![方案B](tmp/flow_b.png)
-```
-
-### 图配文页（尽可能少用）
-
-同时包含结构化文字内容（二级标题、列表、表格等）和图片引用，自动识别为图配文页。左侧 2/3 渲染文字，右侧 1/3 渲染图片：
-
-```markdown
-## 系统架构
-- 前端采用 React 框架
-- 后端使用 Python FastAPI
-- 数据库采用 PostgreSQL
-
-![](src/architecture.png)
-```
-
-> 图配文页的图片同样支持 `src/` 或 `tmp/` 路径。
-
-### 结束页
-
-**无需在 Markdown 中编写**，PPT 末尾自动生成「谢谢」页。
-
-## 页面类型速查
-
-| 类型 | 检测规则 | 背景图（可通过元数据覆盖） |
-|------|---------|---------------------------|
-| 封面 | `# ` 一级标题 | `cover.png` |
-| 内容 | 列表、表格、纯文本等 | `background.png` |
-| 图片 | `![](...)` 图片引用（无结构化文字） | `background.png` |
-| 图配文 | 结构化文字 + 图片引用 | `background.png` |
-| 结束 | 自动追加 | `cover.png` |
-
-背景图缺失时回退为纯白背景。
-
-## 元数据（可选）
-
-在第一个 `---` 之前，通过 HTML 注释指定背景图，覆盖默认值：
-
-```markdown
-<!-- cover: custom_cover.png -->
-<!-- background: custom_bg.png -->
-
-# 标题
-## 演讲人
----
-```
-
-- `cover`：封面及结束页背景图
-- `background`：内容页、图片页、图配文页背景图
+- `<!-- cover: path/to/cover.png -->` — 封面及结束页背景图
+- `<!-- background: path/to/bg.png -->` — 内容页/图片页/图配文页背景图
 - 路径相对于 Markdown 文件所在目录
-- 未指定时使用默认值 `cover.png` / `background.png`
+
+## Font Specifications
+
+| 文本类型 | 中文字体 | 英文字体 | 字号 |
+|----------|----------|----------|------|
+| 一级标题 | 宋体 (SimSun) | Times New Roman | 66pt |
+| 二级标题 | 宋体 (SimSun) | Times New Roman | 44pt |
+| 正文 | 仿宋 (FangSong) | Times New Roman | 32pt |
+| 表格表头 | 宋体 (SimSun) | Times New Roman | 32pt |
+| 表格内容 | 仿宋 (FangSong) | Times New Roman | 32pt |
+
+正文支持 `**加粗**` 行内语法。
+
+## Procedure
+
+### 1. Understand the User's Request
+
+确定用户想要生成什么内容的 PPT。如果用户提供了具体内容大纲，按 Markdown 语法结构编写。如果用户只描述了主题，先构思内容结构。
+
+### 2. Create the Markdown Content
+
+编写或更新 `content.md`（或用户指定的文件），遵循以下规则：
+
+- 使用 `#` 一级标题定义封面标题
+- 使用 `##` 二级标题定义演讲人或内容页标题
+- 使用 `---` 分隔不同页面
+- 图片页使用 `![说明](路径)` 语法
+- 表格使用标准 Markdown 表格语法
+- 通过 HTML 注释指定自定义背景图
+
+### 3. Prepare Assets (if needed)
+
+提示用户将背景图片放置在正确位置：
+- `cover.png`：与 `build_ppt.py` 同目录，用于封面和结束页
+- `background.png`：与 `build_ppt.py` 同目录，用于内容页/图片页/图配文页
+- 图片引用路径相对于 Markdown 文件所在目录
+
+### 4. Run the Build Script
+
+```bash
+python build_ppt.py [markdown_file]
+```
+
+- 若未指定文件，默认读取 `content.md`
+- 输出文件与输入 Markdown 同名，扩展名为 `.pptx`
+
+### 5. Verify Output
+
+确认生成的 `.pptx` 文件页码正确、内容完整、图片显示正常。
+
+## Dependencies
+
+项目需要以下 Python 包：
+- `python-pptx` — PPT 生成
+- `Pillow` (PIL) — 图片尺寸读取
+- `lxml` — XML 操作（设置中文字体）
+
+## File Structure
+
+```
+gen_ppt/
+├── build_ppt.py       # 主构建脚本
+├── package.py         # 打包脚本（生成 .exe）
+├── content.md         # 默认输入文件
+├── cover.png          # 封面背景（可选）
+├── background.png     # 内容页背景（可选）
+├── dist/              # 打包输出目录
+└── README.md          # 项目文档
+```
+
+## Tips
+
+- 内容页若只需展示一个大标题（章节页），仅写一个 `## 标题` 即可自动居中
+- 图片路径支持相对路径（相对于 Markdown 文件所在目录）
+- 表格采用三段式学术风格，适合数据清晰展示
+- 打包为独立可执行文件：`python package.py`（Windows 生成 `.exe`，Linux 生成二进制文件）
+- 背景图缺失时自动回退为纯白背景，不会报错

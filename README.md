@@ -137,11 +137,8 @@ python package.py --clean      # 先清理再打包
 gen_ppt/
 ├── build_ppt.py       # 主构建脚本，读取 Markdown 生成 .pptx
 ├── package.py         # 打包脚本，生成独立可执行文件
-├── content.md         # 输入的结构化 Markdown 内容
 ├── cover.png          # 封面背景图（与 build_ppt.py 同目录）
 ├── background.png     # 内容页/图片展示页背景图（与 build_ppt.py 同目录）
-├── src/               # 静态资源目录（图片等素材）
-├── tmp/               # 临时资源目录
 ├── dist/              # 打包输出目录（.exe / Linux binary）
 └── README.md          # 本文件
 ```
